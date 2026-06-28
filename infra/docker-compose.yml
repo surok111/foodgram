@@ -1,42 +1,11 @@
+version: '3.3'
 services:
-
-  db:
-    image: postgres:15-alpine
-    container_name: foodgram-db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  backend:
-    build: ../backend
-    container_name: foodgram-backend
-    volumes:
-      - media_data:/app/media/
-      - static_data:/app/collected_static/
-      - ../data:/app/data
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             python manage.py load_ingredients --file=data/ingredients.json &&
-             gunicorn --bind 0.0.0.0:8000 foodgram_project.wsgi"
 
   frontend:
     container_name: foodgram-front
     build: ../frontend
     volumes:
-      - frontend_build:/app/result_build/
-
+      - ../frontend/:/app/result_build/
   nginx:
     container_name: foodgram-proxy
     image: nginx:1.25.4-alpine
@@ -44,16 +13,5 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      - frontend_build:/usr/share/nginx/html/
+      - ../frontend/build:/usr/share/nginx/html/
       - ../docs/:/usr/share/nginx/html/api/docs/
-      - static_data:/var/html/static/
-      - media_data:/var/html/media/
-    depends_on:
-      - backend
-      - frontend
-
-volumes:
-  postgres_data:
-  media_data:
-  static_data:
-  frontend_build:

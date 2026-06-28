@@ -1,0 +1,3 @@
+login: admin
+password: Admin123456
+vm_name: foodgram-server

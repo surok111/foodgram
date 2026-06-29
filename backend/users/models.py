@@ -3,12 +3,14 @@ from django.db import models
 
 
 class User(AbstractUser):
-    email = models.EmailField('Email', unique=True, max_length=254)
-    first_name = models.CharField('Имя', max_length=150)
-    last_name = models.CharField('Фамилия', max_length=150)
-    username = models.CharField('Логин', max_length=150, unique=True)
+    email = models.EmailField(unique=True, verbose_name='Email')
+    first_name = models.CharField(max_length=150, verbose_name='Имя')
+    last_name = models.CharField(max_length=150, verbose_name='Фамилия')
     avatar = models.ImageField(
-        'Аватар', upload_to='users/', null=True, blank=True
+        upload_to='users/avatars/',
+        null=True,
+        blank=True,
+        verbose_name='Аватар'
     )
 
     USERNAME_FIELD = 'email'
@@ -26,21 +28,18 @@ class User(AbstractUser):
 class Subscription(models.Model):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,
-        related_name='subscriber', verbose_name='Подписчик'
+        related_name='follower', verbose_name='Подписчик'
     )
     author = models.ForeignKey(
         User, on_delete=models.CASCADE,
-        related_name='subscribing', verbose_name='Автор'
+        related_name='following', verbose_name='Автор'
     )
 
     class Meta:
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
         constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'author'],
-                name='unique_subscription'
-            )
+            models.UniqueConstraint(fields=['user', 'author'], name='unique_subscription')
         ]
 
     def __str__(self):

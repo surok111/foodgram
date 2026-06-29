@@ -1,12 +1,11 @@
 from django.contrib import admin
-
 from .models import Tag, Ingredient, Recipe, RecipeIngredient, Favorite, ShoppingCart
 
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'slug')
-    search_fields = ('name',)
+    prepopulated_fields = {'slug': ('name',)}
 
 
 @admin.register(Ingredient)
@@ -27,10 +26,9 @@ class RecipeAdmin(admin.ModelAdmin):
     search_fields = ('name', 'author__username', 'author__email')
     list_filter = ('tags',)
     inlines = [RecipeIngredientInline]
-    readonly_fields = ('favorites_count',)
 
     def favorites_count(self, obj):
-        return obj.favorited_by.count()
+        return obj.favorites.count()
     favorites_count.short_description = 'В избранном'
 
 

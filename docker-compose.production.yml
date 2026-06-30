@@ -1,0 +1,53 @@
+volumes:
+  postgres_data:
+  static_value:
+  media_value:
+  frontend_value:
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: foodgram-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+
+  backend:
+    container_name: foodgram-backend
+    image: ${DOCKER_USERNAME}/foodgram_backend:latest
+    volumes:
+      - static_value:/app/collected_static/
+      - media_value:/app/media/
+      - ./data:/app/data
+    depends_on:
+      - db
+    env_file:
+      - .env
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --no-input &&
+             python manage.py load_ingredients --path /app/data/ingredients.json &&
+             gunicorn --bind 0:8000 foodgram_project.wsgi"
+
+  frontend:
+    container_name: foodgram-front
+    image: ${DOCKER_USERNAME}/foodgram_frontend:latest
+    volumes:
+      - frontend_value:/app/result_build/
+
+  nginx:
+    container_name: foodgram-proxy
+    image: ${DOCKER_USERNAME}/foodgram_gateway:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - frontend_value:/usr/share/nginx/html/
+      - ../docs/:/usr/share/nginx/html/api/docs/
+      - static_value:/var/html/static/
+      - media_value:/var/html/media/
+      - /etc/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - backend
+      - frontend

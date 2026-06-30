@@ -20,7 +20,9 @@ class Command(BaseCommand):
         # Also try relative paths
         if not os.path.exists(data_path):
             base = os.path.dirname(os.path.abspath(__file__))
-            data_path = os.path.join(base, '..', '..', '..', '..', 'data', 'ingredients.json')
+            data_path = os.path.join(
+                base, '..', '..', '..', '..', 'data', 'ingredients.json'
+            )
             data_path = os.path.abspath(data_path)
 
         if not os.path.exists(data_path):
@@ -39,4 +41,8 @@ class Command(BaseCommand):
             if was_created:
                 created += 1
 
-        self.stdout.write(self.style.SUCCESS(f'Successfully loaded {created} new ingredients'))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Successfully loaded {created} new ingredients'
+            )
+        )

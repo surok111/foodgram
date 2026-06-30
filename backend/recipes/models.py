@@ -6,8 +6,12 @@ User = get_user_model()
 
 
 class Tag(models.Model):
-    name = models.CharField(max_length=200, unique=True, verbose_name='Название')
-    slug = models.SlugField(max_length=200, unique=True, verbose_name='Slug')
+    name = models.CharField(
+        max_length=200, unique=True, verbose_name='Название'
+    )
+    slug = models.SlugField(
+        max_length=200, unique=True, verbose_name='Slug'
+    )
 
     class Meta:
         verbose_name = 'Тег'
@@ -19,7 +23,9 @@ class Tag(models.Model):
 
 class Ingredient(models.Model):
     name = models.CharField(max_length=200, verbose_name='Название')
-    measurement_unit = models.CharField(max_length=200, verbose_name='Единица измерения')
+    measurement_unit = models.CharField(
+        max_length=200, verbose_name='Единица измерения'
+    )
 
     class Meta:
         verbose_name = 'Ингредиент'
@@ -36,7 +42,9 @@ class Recipe(models.Model):
         related_name='recipes', verbose_name='Автор'
     )
     name = models.CharField(max_length=200, verbose_name='Название')
-    image = models.ImageField(upload_to='recipes/images/', verbose_name='Картинка')
+    image = models.ImageField(
+        upload_to='recipes/images/', verbose_name='Картинка'
+    )
     text = models.TextField(verbose_name='Описание')
     ingredients = models.ManyToManyField(
         Ingredient, through='RecipeIngredient',
@@ -47,8 +55,12 @@ class Recipe(models.Model):
         validators=[MinValueValidator(1)],
         verbose_name='Время приготовления (мин)'
     )
-    pub_date = models.DateTimeField(auto_now_add=True, verbose_name='Дата публикации')
-    short_link = models.CharField(max_length=10, unique=True, blank=True, null=True)
+    pub_date = models.DateTimeField(
+        auto_now_add=True, verbose_name='Дата публикации'
+    )
+    short_link = models.CharField(
+        max_length=10, unique=True, blank=True, null=True
+    )
 
     class Meta:
         verbose_name = 'Рецепт'
@@ -79,7 +91,8 @@ class RecipeIngredient(models.Model):
         verbose_name_plural = 'Ингредиенты рецептов'
         constraints = [
             models.UniqueConstraint(
-                fields=['recipe', 'ingredient'], name='unique_recipe_ingredient'
+                fields=['recipe', 'ingredient'],
+                name='unique_recipe_ingredient'
             )
         ]
 
@@ -96,7 +109,9 @@ class Favorite(models.Model):
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
         constraints = [
-            models.UniqueConstraint(fields=['user', 'recipe'], name='unique_favorite')
+            models.UniqueConstraint(
+                fields=['user', 'recipe'], name='unique_favorite'
+            )
         ]
 
 
@@ -112,5 +127,8 @@ class ShoppingCart(models.Model):
         verbose_name = 'Список покупок'
         verbose_name_plural = 'Список покупок'
         constraints = [
-            models.UniqueConstraint(fields=['user', 'recipe'], name='unique_shopping_cart')
+            models.UniqueConstraint(
+                fields=['user', 'recipe'],
+                name='unique_shopping_cart'
+            )
         ]

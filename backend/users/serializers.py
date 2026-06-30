@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 from djoser.serializers import UserCreateSerializer, UserSerializer
-from recipes.models import Recipe
 
 User = get_user_model()
 
@@ -20,11 +19,16 @@ class Base64ImageField(serializers.ImageField):
 class CustomUserCreateSerializer(UserCreateSerializer):
     class Meta(UserCreateSerializer.Meta):
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'password')
+        fields = (
+            'id', 'email', 'username',
+            'first_name', 'last_name', 'password'
+        )
 
     def validate_username(self, value):
         if value.lower() == 'me':
-            raise serializers.ValidationError("Имя пользователя 'me' недопустимо.")
+            raise serializers.ValidationError(
+                "Имя пользователя 'me' недопустимо."
+            )
         return value
 
 
@@ -34,7 +38,10 @@ class CustomUserSerializer(UserSerializer):
 
     class Meta(UserSerializer.Meta):
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'is_subscribed', 'avatar')
+        fields = (
+            'id', 'email', 'username', 'first_name', 'last_name',
+            'is_subscribed', 'avatar'
+        )
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
@@ -69,18 +76,24 @@ class SubscriptionSerializer(CustomUserSerializer):
     recipes_count = serializers.SerializerMethodField()
 
     class Meta(CustomUserSerializer.Meta):
-        fields = CustomUserSerializer.Meta.fields + ('recipes', 'recipes_count')
+        fields = CustomUserSerializer.Meta.fields + (
+            'recipes', 'recipes_count'
+        )
 
     def get_recipes(self, obj):
         request = self.context.get('request')
-        recipes_limit = request.query_params.get('recipes_limit') if request else None
+        recipes_limit = (
+            request.query_params.get('recipes_limit') if request else None
+        )
         recipes = obj.recipes.all()
         if recipes_limit:
             try:
                 recipes = recipes[:int(recipes_limit)]
             except (ValueError, TypeError):
                 pass
-        return ShortRecipeSerializer(recipes, many=True, context=self.context).data
+        return ShortRecipeSerializer(
+            recipes, many=True, context=self.context
+        ).data
 
     def get_recipes_count(self, obj):
         return obj.recipes.count()

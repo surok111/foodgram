@@ -139,4 +139,6 @@ dmypy.json
 .vscode
 
 static/
-media/
+media/__pycache__/
+*.pyc
+*.pyo

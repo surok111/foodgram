@@ -152,10 +152,8 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          envs: DOCKER_USERNAME
           script: |
             cd foodgram
-            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             sudo docker compose -f docker-compose.production.yml pull
             sudo docker compose -f docker-compose.production.yml down
             sudo docker compose -f docker-compose.production.yml up -d

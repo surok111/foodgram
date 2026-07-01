@@ -6,12 +6,12 @@ from django.shortcuts import redirect
 from django.http import Http404
 from rest_framework.routers import DefaultRouter
 
-from users.views import CustomUserViewSet
+from users.views import UserViewSet
 from recipes.views import TagViewSet, IngredientViewSet, RecipeViewSet
 from recipes.models import Recipe
 
 router = DefaultRouter()
-router.register('users', CustomUserViewSet, basename='users')
+router.register('users', UserViewSet, basename='users')
 router.register('tags', TagViewSet, basename='tags')
 router.register('ingredients', IngredientViewSet, basename='ingredients')
 router.register('recipes', RecipeViewSet, basename='recipes')

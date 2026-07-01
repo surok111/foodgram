@@ -14,12 +14,11 @@ class User(AbstractUser):
     )
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+    REQUIRED_FIELDS = ('username', 'first_name', 'last_name')
 
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
-        ordering = ['id']
 
     def __str__(self):
         return self.username
@@ -38,11 +37,15 @@ class Subscription(models.Model):
     class Meta:
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
-                fields=['user', 'author'], name='unique_subscription'
-            )
-        ]
+                fields=('user', 'author'), name='unique_subscription'
+            ),
+            models.CheckConstraint(
+                check=~models.Q(user=models.F('author')),
+                name='no_self_subscription'
+            ),
+        )
 
     def __str__(self):
         return f'{self.user} подписан на {self.author}'

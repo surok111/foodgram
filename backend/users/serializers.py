@@ -1,13 +1,15 @@
 import base64
+
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from rest_framework import serializers
 from djoser.serializers import UserCreateSerializer, UserSerializer
+from rest_framework import serializers
 
 User = get_user_model()
 
 
 class Base64ImageField(serializers.ImageField):
+
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
             fmt, imgstr = data.split(';base64,')
@@ -16,7 +18,8 @@ class Base64ImageField(serializers.ImageField):
         return super().to_internal_value(data)
 
 
-class CustomUserCreateSerializer(UserCreateSerializer):
+class UserCreateSerializer(UserCreateSerializer):
+
     class Meta(UserCreateSerializer.Meta):
         model = User
         fields = (
@@ -32,7 +35,7 @@ class CustomUserCreateSerializer(UserCreateSerializer):
         return value
 
 
-class CustomUserSerializer(UserSerializer):
+class UserSerializer(UserSerializer):
     is_subscribed = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
 
@@ -43,16 +46,16 @@ class CustomUserSerializer(UserSerializer):
             'is_subscribed', 'avatar'
         )
 
-    def get_is_subscribed(self, obj):
+    def get_is_subscribed(self, author):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.following.filter(user=request.user).exists()
+            return author.following.filter(user=request.user).exists()
         return False
 
-    def get_avatar(self, obj):
+    def get_avatar(self, user):
         request = self.context.get('request')
-        if obj.avatar and request:
-            return request.build_absolute_uri(obj.avatar.url)
+        if user.avatar and request:
+            return request.build_absolute_uri(user.avatar.url)
         return None
 
 
@@ -64,28 +67,28 @@ class ShortRecipeSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
 
-    def get_image(self, obj):
+    def get_image(self, recipe):
         request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
+        if recipe.image and request:
+            return request.build_absolute_uri(recipe.image.url)
         return None
 
 
-class SubscriptionSerializer(CustomUserSerializer):
+class SubscriptionSerializer(UserSerializer):
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
 
-    class Meta(CustomUserSerializer.Meta):
-        fields = CustomUserSerializer.Meta.fields + (
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + (
             'recipes', 'recipes_count'
         )
 
-    def get_recipes(self, obj):
+    def get_recipes(self, author):
         request = self.context.get('request')
         recipes_limit = (
             request.query_params.get('recipes_limit') if request else None
         )
-        recipes = obj.recipes.all()
+        recipes = author.recipes.all()
         if recipes_limit:
             try:
                 recipes = recipes[:int(recipes_limit)]
@@ -95,8 +98,8 @@ class SubscriptionSerializer(CustomUserSerializer):
             recipes, many=True, context=self.context
         ).data
 
-    def get_recipes_count(self, obj):
-        return obj.recipes.count()
+    def get_recipes_count(self, author):
+        return author.recipes.count()
 
 
 class AvatarSerializer(serializers.ModelSerializer):

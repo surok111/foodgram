@@ -1,3 +1,6 @@
+import random
+import string
+
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -59,7 +62,7 @@ class Recipe(models.Model):
         auto_now_add=True, verbose_name='Дата публикации'
     )
     short_link = models.CharField(
-        max_length=10, unique=True, blank=True, null=True
+        max_length=10, unique=True, blank=True, default=""
     )
 
     class Meta:
@@ -73,13 +76,24 @@ class Recipe(models.Model):
     def get_favorites_count(self):
         return self.favorites.count()
 
+    def generate_short_link(self):
+        chars = string.ascii_letters + string.digits
+        while True:
+            short = ''.join(random.choices(chars, k=6))
+            if not Recipe.objects.filter(short_link=short).exists():
+                break
+        self.short_link = short
+        self.save()
+
 
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE, related_name='recipe_ingredients'
+        Recipe, on_delete=models.CASCADE,
+        related_name='recipe_ingredients', verbose_name='Рецепт'
     )
     ingredient = models.ForeignKey(
-        Ingredient, on_delete=models.CASCADE, related_name='recipe_ingredients'
+        Ingredient, on_delete=models.CASCADE,
+        related_name='recipe_ingredients', verbose_name='Ингредиент'
     )
     amount = models.PositiveIntegerField(
         validators=[MinValueValidator(1)],
@@ -96,13 +110,18 @@ class RecipeIngredient(models.Model):
             ),
         )
 
+    def __str__(self):
+        return f'{self.ingredient} — {self.amount}'
+
 
 class Favorite(models.Model):
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='favorites'
+        User, on_delete=models.CASCADE,
+        related_name='favorites', verbose_name='Пользователь'
     )
     recipe = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE, related_name='favorites'
+        Recipe, on_delete=models.CASCADE,
+        related_name='favorites', verbose_name='Рецепт'
     )
 
     class Meta:
@@ -114,13 +133,18 @@ class Favorite(models.Model):
             ),
         )
 
+    def __str__(self):
+        return f'{self.user} — {self.recipe}'
+
 
 class ShoppingCart(models.Model):
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='shopping_cart'
+        User, on_delete=models.CASCADE,
+        related_name='shopping_cart', verbose_name='Пользователь'
     )
     recipe = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE, related_name='shopping_cart'
+        Recipe, on_delete=models.CASCADE,
+        related_name='shopping_cart', verbose_name='Рецепт'
     )
 
     class Meta:
@@ -132,3 +156,6 @@ class ShoppingCart(models.Model):
                 name='unique_shopping_cart'
             ),
         )
+
+    def __str__(self):
+        return f'{self.user} — {self.recipe}'

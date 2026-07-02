@@ -23,6 +23,12 @@ class User(AbstractUser):
     def __str__(self):
         return self.username
 
+    def delete_avatar(self):
+        if self.avatar:
+            self.avatar.delete()
+            self.avatar = None
+            self.save()
+
 
 class Subscription(models.Model):
     user = models.ForeignKey(

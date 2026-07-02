@@ -27,7 +27,7 @@ def redirect_short_link(request, short_link):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include(router.urls)),
+    path('api/', include('api.urls')),
     path('api/auth/', include('djoser.urls.authtoken')),
     path('s/<str:short_link>/', redirect_short_link, name='short-link'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,21 +1,23 @@
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from recipes.pagination import CustomPagination
+from recipes.pagination import Pagination
 
-from .models import Subscription, User
 from .serializers import (
-    AvatarSerializer, SubscriptionSerializer, UserSerializer
+    AvatarSerializer, SubscriptionCreateSerializer,
+    SubscriptionSerializer, UserSerializer
 )
+
+User = get_user_model()
 
 
 class UserViewSet(DjoserUserViewSet):
-    pagination_class = CustomPagination
+    pagination_class = Pagination
 
     @action(
         detail=False, methods=('get',),
@@ -32,8 +34,9 @@ class UserViewSet(DjoserUserViewSet):
         permission_classes=(IsAuthenticated,)
     )
     def subscriptions(self, request):
-        queryset = User.objects.filter(following__user=request.user)
-        page = self.paginate_queryset(queryset)
+        queryset = request.user.follower.values('author')
+        users = User.objects.filter(id__in=queryset)
+        page = self.paginate_queryset(users)
         serializer = SubscriptionSerializer(
             page, many=True, context={'request': request}
         )
@@ -46,23 +49,19 @@ class UserViewSet(DjoserUserViewSet):
     def subscribe(self, request, id=None):
         author = get_object_or_404(User, id=id)
         if request.method == 'POST':
-            if request.user == author:
-                raise ValidationError(
-                    {'errors': 'Нельзя подписаться на себя.'}
-                )
-            _, created = Subscription.objects.get_or_create(
-                user=request.user, author=author
+            serializer = SubscriptionCreateSerializer(
+                data={'user': request.user.id, 'author': author.id},
+                context={'request': request}
             )
-            if not created:
-                raise ValidationError({'errors': 'Вы уже подписаны.'})
-            serializer = SubscriptionSerializer(
-                author, context={'request': request}
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(
+                SubscriptionSerializer(
+                    author, context={'request': request}
+                ).data,
+                status=status.HTTP_201_CREATED
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        subscription = request.user.follower.filter(author=author)
-        if not subscription.exists():
-            raise ValidationError({'errors': 'Подписка не найдена.'})
-        subscription.delete()
+        request.user.follower.filter(author=author).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -81,9 +80,5 @@ class UserViewSet(DjoserUserViewSet):
             if user.avatar:
                 avatar_url = request.build_absolute_uri(user.avatar.url)
             return Response({'avatar': avatar_url})
-        if not user.avatar:
-            raise ValidationError({'errors': 'Аватар не найден.'})
-        user.avatar.delete()
-        user.avatar = None
-        user.save()
+        user.delete_avatar()
         return Response(status=status.HTTP_204_NO_CONTENT)

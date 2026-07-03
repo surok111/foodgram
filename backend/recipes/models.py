@@ -62,7 +62,7 @@ class Recipe(models.Model):
         auto_now_add=True, verbose_name='Дата публикации'
     )
     short_link = models.CharField(
-        max_length=10, unique=True, blank=True, default=""
+        max_length=10, unique=True, blank=True, null=True
     )
 
     class Meta:
@@ -73,9 +73,6 @@ class Recipe(models.Model):
     def __str__(self):
         return self.name
 
-    def get_favorites_count(self):
-        return self.favorites.count()
-
     def generate_short_link(self):
         chars = string.ascii_letters + string.digits
         while True:
@@ -85,15 +82,16 @@ class Recipe(models.Model):
         self.short_link = short
         self.save()
 
+    def get_favorites_count(self):
+        return self.favorites.count()
+
 
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE,
-        related_name='recipe_ingredients', verbose_name='Рецепт'
+        Recipe, on_delete=models.CASCADE, related_name='recipe_ingredients'
     )
     ingredient = models.ForeignKey(
-        Ingredient, on_delete=models.CASCADE,
-        related_name='recipe_ingredients', verbose_name='Ингредиент'
+        Ingredient, on_delete=models.CASCADE, related_name='recipe_ingredients'
     )
     amount = models.PositiveIntegerField(
         validators=[MinValueValidator(1)],
@@ -110,18 +108,13 @@ class RecipeIngredient(models.Model):
             ),
         )
 
-    def __str__(self):
-        return f'{self.ingredient} — {self.amount}'
-
 
 class Favorite(models.Model):
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE,
-        related_name='favorites', verbose_name='Пользователь'
+        User, on_delete=models.CASCADE, related_name='favorites'
     )
     recipe = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE,
-        related_name='favorites', verbose_name='Рецепт'
+        Recipe, on_delete=models.CASCADE, related_name='favorites'
     )
 
     class Meta:
@@ -133,18 +126,13 @@ class Favorite(models.Model):
             ),
         )
 
-    def __str__(self):
-        return f'{self.user} — {self.recipe}'
-
 
 class ShoppingCart(models.Model):
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE,
-        related_name='shopping_cart', verbose_name='Пользователь'
+        User, on_delete=models.CASCADE, related_name='shopping_cart'
     )
     recipe = models.ForeignKey(
-        Recipe, on_delete=models.CASCADE,
-        related_name='shopping_cart', verbose_name='Рецепт'
+        Recipe, on_delete=models.CASCADE, related_name='shopping_cart'
     )
 
     class Meta:
@@ -156,6 +144,3 @@ class ShoppingCart(models.Model):
                 name='unique_shopping_cart'
             ),
         )
-
-    def __str__(self):
-        return f'{self.user} — {self.recipe}'

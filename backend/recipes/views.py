@@ -1,14 +1,10 @@
-import random
-import string
-
+from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -16,12 +12,14 @@ from .filters import IngredientFilter, RecipeFilter
 from .models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
-from .pagination import CustomPagination
+from .pagination import Pagination
 from .permissions import IsAuthorOrReadOnly
 from .serializers import (
-    IngredientSerializer, RecipeCreateSerializer,
-    RecipeListSerializer, ShortRecipeSerializer, TagSerializer
+    FavoriteSerializer, IngredientSerializer, RecipeCreateSerializer,
+    RecipeListSerializer, ShoppingCartSerializer, TagSerializer
 )
+
+User = get_user_model()
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -43,7 +41,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     permission_classes = (IsAuthorOrReadOnly,)
-    pagination_class = CustomPagination
+    pagination_class = Pagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
 
@@ -52,24 +50,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return RecipeCreateSerializer
         return RecipeListSerializer
 
-    def _add_or_remove(self, model, request, pk):
-        recipe = get_object_or_404(Recipe, pk=pk)
+    def _add_or_remove(self, serializer_class, model, request, pk):
+        recipe = self.get_object()
         if request.method == 'POST':
-            _, created = model.objects.get_or_create(
-                user=request.user, recipe=recipe
+            serializer = serializer_class(
+                data={'user': request.user.id, 'recipe': recipe.id},
+                context={'request': request}
             )
-            if not created:
-                raise ValidationError({'errors': 'Рецепт уже добавлен.'})
-            serializer = ShortRecipeSerializer(
-                recipe, context={'request': request}
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        recipe_in_list = model.objects.filter(
+        model.objects.filter(
             user=request.user, recipe=recipe
-        )
-        if not recipe_in_list.exists():
-            raise ValidationError({'errors': 'Рецепт не найден.'})
-        recipe_in_list.delete()
+        ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -77,14 +72,16 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=(IsAuthenticated,)
     )
     def favorite(self, request, pk=None):
-        return self._add_or_remove(Favorite, request, pk)
+        return self._add_or_remove(FavoriteSerializer, Favorite, request, pk)
 
     @action(
         detail=True, methods=('post', 'delete'),
         permission_classes=(IsAuthenticated,)
     )
     def shopping_cart(self, request, pk=None):
-        return self._add_or_remove(ShoppingCart, request, pk)
+        return self._add_or_remove(
+            ShoppingCartSerializer, ShoppingCart, request, pk
+        )
 
     @action(
         detail=False, methods=('get',),
@@ -92,15 +89,17 @@ class RecipeViewSet(viewsets.ModelViewSet):
     )
     def download_shopping_cart(self, request):
         ingredients = RecipeIngredient.objects.filter(
-            recipe__shopping_cart__user=request.user
+            recipe__in=request.user.shopping_cart.values('recipe')
         ).values(
             'ingredient__name', 'ingredient__measurement_unit'
         ).annotate(total_amount=Sum('amount')).order_by('ingredient__name')
 
-        content = 'Список покупок:\n' + ''.join(
-            f"- {item.get('ingredient__name')} "
-            f"({item.get('ingredient__measurement_unit')}) "
-            f"— {item.get('total_amount')}\n"
+        content = 'Список покупок:\n' + '\n'.join(
+            '- {} ({}) — {}'.format(
+                item['ingredient__name'],
+                item['ingredient__measurement_unit'],
+                item['total_amount']
+            )
             for item in ingredients
         )
         response = HttpResponse(
@@ -118,13 +117,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_link(self, request, pk=None):
         recipe = self.get_object()
         if not recipe.short_link:
-            chars = string.ascii_letters + string.digits
-            while True:
-                short = ''.join(random.choices(chars, k=6))
-                if not Recipe.objects.filter(short_link=short).exists():
-                    break
-            recipe.short_link = short
-            recipe.save()
+            recipe.generate_short_link()
         short_url = request.build_absolute_uri(
             reverse('short-url', args=(recipe.short_link,))
         )

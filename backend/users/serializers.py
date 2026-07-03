@@ -5,6 +5,8 @@ from django.core.files.base import ContentFile
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from rest_framework import serializers
 
+from recipes.models import Recipe
+
 User = get_user_model()
 
 
@@ -14,7 +16,7 @@ class Base64ImageField(serializers.ImageField):
         if isinstance(data, str) and data.startswith('data:image'):
             fmt, imgstr = data.split(';base64,')
             ext = fmt.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
+            data = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
         return super().to_internal_value(data)
 
 
@@ -63,7 +65,6 @@ class ShortRecipeSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
     class Meta:
-        from recipes.models import Recipe
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
 

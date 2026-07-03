@@ -1,26 +1,140 @@
 import base64
+
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
-from .models import Tag, Ingredient, Recipe, RecipeIngredient
-from users.serializers import UserSerializer
+from rest_framework.validators import UniqueTogetherValidator
+
+from .models import (
+    Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
+)
+from users.models import Subscription
+
+User = get_user_model()
 
 
 class Base64ImageField(serializers.ImageField):
+
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
             fmt, imgstr = data.split(';base64,')
             ext = fmt.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
+            data = ContentFile(
+                base64.b64decode(imgstr), name=f'temp.{ext}'
+            )
         return super().to_internal_value(data)
 
 
+class UserSerializer(serializers.ModelSerializer):
+    is_subscribed = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            'id', 'email', 'username', 'first_name', 'last_name',
+            'is_subscribed', 'avatar'
+        )
+
+    def get_is_subscribed(self, author):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return author.following.filter(user=request.user).exists()
+        return False
+
+    def get_avatar(self, user):
+        request = self.context.get('request')
+        if user.avatar and request:
+            return request.build_absolute_uri(user.avatar.url)
+        return None
+
+
+class ShortRecipeSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Recipe
+        fields = ('id', 'name', 'image', 'cooking_time')
+
+    def get_image(self, recipe):
+        request = self.context.get('request')
+        if recipe.image and request:
+            return request.build_absolute_uri(recipe.image.url)
+        return None
+
+
+class AvatarSerializer(serializers.ModelSerializer):
+    avatar = Base64ImageField()
+
+    class Meta:
+        model = User
+        fields = ('avatar',)
+
+    def validate_avatar(self, value):
+        if not value:
+            raise serializers.ValidationError('Аватар не найден.')
+        return value
+
+
+class SubscriptionSerializer(UserSerializer):
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + (
+            'recipes', 'recipes_count'
+        )
+
+    def get_recipes(self, author):
+        request = self.context.get('request')
+        recipes_limit = (
+            request.query_params.get('recipes_limit') if request else None
+        )
+        recipes = author.recipes.all()
+        if recipes_limit:
+            try:
+                recipes = recipes[:int(recipes_limit)]
+            except (ValueError, TypeError):
+                pass
+        return ShortRecipeSerializer(
+            recipes, many=True, context=self.context
+        ).data
+
+    def get_recipes_count(self, author):
+        return author.recipes.count()
+
+
+class SubscriptionCreateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Subscription
+        fields = ('user', 'author')
+        validators = (
+            UniqueTogetherValidator(
+                queryset=Subscription.objects.all(),
+                fields=('user', 'author'),
+                message='Вы уже подписаны.'
+            ),
+        )
+
+    def validate(self, data):
+        if data['user'] == data['author']:
+            raise serializers.ValidationError(
+                {'errors': 'Нельзя подписаться на себя.'}
+            )
+        return data
+
+
 class TagSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Tag
         fields = ('id', 'name', 'slug')
 
 
 class IngredientSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Ingredient
         fields = ('id', 'name', 'measurement_unit')
@@ -123,17 +237,14 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return value
 
     def _create_ingredients(self, recipe, ingredients_data):
-        ingredient_objects = []
-        for item in ingredients_data:
-            ingredient = Ingredient.objects.get(id=item['id'])
-            ingredient_objects.append(
-                RecipeIngredient(
-                    recipe=recipe,
-                    ingredient=ingredient,
-                    amount=item['amount']
-                )
+        RecipeIngredient.objects.bulk_create([
+            RecipeIngredient(
+                recipe=recipe,
+                ingredient=get_object_or_404(Ingredient, id=item['id']),
+                amount=item['amount']
             )
-        RecipeIngredient.objects.bulk_create(ingredient_objects)
+            for item in ingredients_data
+        ])
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
@@ -158,15 +269,39 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return RecipeListSerializer(instance, context=self.context).data
 
 
-class ShortRecipeSerializer(serializers.ModelSerializer):
-    image = serializers.SerializerMethodField()
+class FavoriteSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = Recipe
-        fields = ('id', 'name', 'image', 'cooking_time')
+        model = Favorite
+        fields = ('user', 'recipe')
+        validators = (
+            UniqueTogetherValidator(
+                queryset=Favorite.objects.all(),
+                fields=('user', 'recipe'),
+                message='Рецепт уже в избранном.'
+            ),
+        )
 
-    def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return None
+    def to_representation(self, instance):
+        return ShortRecipeSerializer(
+            instance.recipe, context=self.context
+        ).data
+
+
+class ShoppingCartSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ShoppingCart
+        fields = ('user', 'recipe')
+        validators = (
+            UniqueTogetherValidator(
+                queryset=ShoppingCart.objects.all(),
+                fields=('user', 'recipe'),
+                message='Рецепт уже в списке покупок.'
+            ),
+        )
+
+    def to_representation(self, instance):
+        return ShortRecipeSerializer(
+            instance.recipe, context=self.context
+        ).data

@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -12,10 +13,9 @@ from rest_framework.response import Response
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
-from users.models import Subscription, User
 
 from .filters import IngredientFilter, RecipeFilter
-from .pagination import CustomPagination
+from .pagination import Pagination
 from .permissions import IsAuthorOrReadOnly
 from .serializers import (
     AvatarSerializer, FavoriteSerializer, IngredientSerializer,
@@ -24,9 +24,11 @@ from .serializers import (
     SubscriptionSerializer, TagSerializer, UserSerializer
 )
 
+User = get_user_model()
+
 
 class UserViewSet(DjoserUserViewSet):
-    pagination_class = CustomPagination
+    pagination_class = Pagination
 
     @action(
         detail=False, methods=('get',),
@@ -43,7 +45,9 @@ class UserViewSet(DjoserUserViewSet):
         permission_classes=(IsAuthenticated,)
     )
     def subscriptions(self, request):
-        queryset = User.objects.filter(following__user=request.user)
+        queryset = User.objects.filter(
+            id__in=request.user.follower.values('author')
+        )
         page = self.paginate_queryset(queryset)
         serializer = SubscriptionSerializer(
             page, many=True, context={'request': request}
@@ -69,9 +73,7 @@ class UserViewSet(DjoserUserViewSet):
                 ).data,
                 status=status.HTTP_201_CREATED
             )
-        Subscription.objects.filter(
-            user=request.user, author=author
-        ).delete()
+        request.user.follower.filter(author=author).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -113,7 +115,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     permission_classes = (IsAuthorOrReadOnly,)
-    pagination_class = CustomPagination
+    pagination_class = Pagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
 
@@ -164,14 +166,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
             'ingredient__name', 'ingredient__measurement_unit'
         ).annotate(total_amount=Sum('amount')).order_by('ingredient__name')
 
-        lines = ['Список покупок:']
-        for item in ingredients:
-            name = item['ingredient__name']
-            unit = item['ingredient__measurement_unit']
-            amount = item['total_amount']
-            lines.append('- {} ({}) — {}'.format(name, unit, amount))
-        content = '\n'.join(lines)
-
+        content = 'Список покупок:\n' + '\n'.join(
+            '- {} ({}) — {}'.format(
+                item['ingredient__name'],
+                item['ingredient__measurement_unit'],
+                item['total_amount']
+            )
+            for item in ingredients
+        )
         response = HttpResponse(
             content, content_type='text/plain; charset=utf-8'
         )

@@ -166,14 +166,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
             'ingredient__name', 'ingredient__measurement_unit'
         ).annotate(total_amount=Sum('amount')).order_by('ingredient__name')
 
-        content = 'Список покупок:\n' + '\n'.join(
-            '- {} ({}) — {}'.format(
-                item['ingredient__name'],
-                item['ingredient__measurement_unit'],
-                item['total_amount']
-            )
-            for item in ingredients
-        )
+        lines = ['Список покупок:']
+        for item in ingredients:
+            lines.append('- {name} ({unit}) — {amount}'.format(
+                name=item['ingredient__name'],
+                unit=item['ingredient__measurement_unit'],
+                amount=item['total_amount']
+            ))
+        content = '\n'.join(lines)
         response = HttpResponse(
             content, content_type='text/plain; charset=utf-8'
         )

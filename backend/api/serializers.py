@@ -69,18 +69,21 @@ class AvatarSerializer(serializers.ModelSerializer):
         fields = ('avatar',)
 
 
-class ShortRecipeSerializer(serializers.ModelSerializer):
+class ImageSerializerMixin(serializers.Serializer):
     image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+
+class ShortRecipeSerializer(ImageSerializerMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
-
-    def get_image(self, recipe):
-        request = self.context.get('request')
-        if recipe.image and request:
-            return request.build_absolute_uri(recipe.image.url)
-        return None
 
 
 class SubscriptionSerializer(UserSerializer):
@@ -162,7 +165,7 @@ class RecipeIngredientCreateSerializer(serializers.Serializer):
     amount = serializers.IntegerField(min_value=1)
 
 
-class RecipeListSerializer(serializers.ModelSerializer):
+class RecipeListSerializer(ImageSerializerMixin, serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     author = UserSerializer(read_only=True)
     ingredients = RecipeIngredientSerializer(
@@ -170,7 +173,6 @@ class RecipeListSerializer(serializers.ModelSerializer):
     )
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
-    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -179,12 +181,6 @@ class RecipeListSerializer(serializers.ModelSerializer):
             'is_favorited', 'is_in_shopping_cart',
             'name', 'image', 'text', 'cooking_time'
         )
-
-    def get_image(self, obj):
-        request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return None
 
     def get_is_favorited(self, obj):
         request = self.context.get('request')
@@ -201,9 +197,6 @@ class RecipeListSerializer(serializers.ModelSerializer):
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientCreateSerializer(many=True)
-    tags = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Tag.objects.all()
-    )
     image = Base64ImageField()
     cooking_time = serializers.IntegerField(
         min_value=1,

@@ -8,10 +8,17 @@ from django.db import models
 User = get_user_model()
 
 
-class Tag(models.Model):
-    name = models.CharField(
-        max_length=200, unique=True, verbose_name='Название'
-    )
+class NamedModel(models.Model):
+    name = models.CharField(max_length=200, verbose_name='Название')
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return self.name
+
+
+class Tag(NamedModel):
     slug = models.SlugField(
         max_length=200, unique=True, verbose_name='Slug'
     )
@@ -19,13 +26,14 @@ class Tag(models.Model):
     class Meta:
         verbose_name = 'Тег'
         verbose_name_plural = 'Теги'
+        constraints = (
+            models.UniqueConstraint(
+                fields=('name',), name='unique_tag_name'
+            ),
+        )
 
-    def __str__(self):
-        return self.name
 
-
-class Ingredient(models.Model):
-    name = models.CharField(max_length=200, verbose_name='Название')
+class Ingredient(NamedModel):
     measurement_unit = models.CharField(
         max_length=200, verbose_name='Единица измерения'
     )
@@ -39,12 +47,11 @@ class Ingredient(models.Model):
         return f'{self.name}, {self.measurement_unit}'
 
 
-class Recipe(models.Model):
+class Recipe(NamedModel):
     author = models.ForeignKey(
         User, on_delete=models.CASCADE,
         related_name='recipes', verbose_name='Автор'
     )
-    name = models.CharField(max_length=200, verbose_name='Название')
     image = models.ImageField(
         upload_to='recipes/images/', verbose_name='Картинка'
     )
@@ -62,16 +69,14 @@ class Recipe(models.Model):
         auto_now_add=True, verbose_name='Дата публикации'
     )
     short_link = models.CharField(
-        max_length=10, unique=True, blank=True, default=''
+        max_length=10, unique=True, blank=True, default='',
+        verbose_name='Короткая ссылка'
     )
 
     class Meta:
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
         ordering = ('-pub_date',)
-
-    def __str__(self):
-        return self.name
 
     def generate_short_link(self):
         chars = string.ascii_letters + string.digits

@@ -3,7 +3,7 @@ import base64
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
-from djoser.serializers import UserCreateSerializer, UserSerializer
+from djoser.serializers import UserSerializer
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
@@ -25,16 +25,6 @@ class Base64ImageField(serializers.ImageField):
                 base64.b64decode(imgstr), name=f'temp.{ext}'
             )
         return super().to_internal_value(data)
-
-
-class UserCreateSerializer(UserCreateSerializer):
-
-    class Meta(UserCreateSerializer.Meta):
-        model = User
-        fields = (
-            'id', 'email', 'username',
-            'first_name', 'last_name', 'password'
-        )
 
 
 class UserSerializer(UserSerializer):
@@ -127,7 +117,7 @@ class SubscriptionCreateSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, data):
-        if data['user'] == data['author']:
+        if self.context['request'].user == data['author']:
             raise serializers.ValidationError(
                 {'errors': 'Нельзя подписаться на себя.'}
             )
@@ -185,13 +175,13 @@ class RecipeListSerializer(ImageSerializerMixin, serializers.ModelSerializer):
     def get_is_favorited(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.favorite_set.filter(user=request.user).exists()
+            return obj.favorite.filter(user=request.user).exists()
         return False
 
     def get_is_in_shopping_cart(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.shoppingcart_set.filter(user=request.user).exists()
+            return obj.shoppingcart.filter(user=request.user).exists()
         return False
 
 
@@ -234,20 +224,20 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return data
 
     def _create_ingredients(self, recipe, ingredients_data):
-        RecipeIngredient.objects.bulk_create([
+        RecipeIngredient.objects.bulk_create(
             RecipeIngredient(
                 recipe=recipe,
                 ingredient=get_object_or_404(Ingredient, id=item['id']),
                 amount=item['amount']
             )
             for item in ingredients_data
-        ])
+        )
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
-        validated_data['author'] = self.context['request'].user
-        recipe = super().create(validated_data)
+        data = {**validated_data, 'author': self.context['request'].user}
+        recipe = super().create(data)
         recipe.tags.set(tags)
         self._create_ingredients(recipe, ingredients_data)
         return recipe

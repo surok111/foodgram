@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db.models import F, Sum
+from django.db.models import Exists, F, OuterRef, Sum
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -27,6 +27,24 @@ from .serializers import (
 User = get_user_model()
 
 
+class UserRelationMixin:
+
+    def _add_or_remove(self, serializer_class, model, request, pk):
+        recipe = self.get_object()
+        if request.method == 'POST':
+            serializer = serializer_class(
+                data={'user': request.user.id, 'recipe': recipe.id},
+                context=self.get_serializer_context()
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED
+            )
+        model.objects.filter(user=request.user, recipe=recipe).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class ReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
@@ -40,7 +58,8 @@ class UserViewSet(DjoserUserViewSet):
     )
     def me(self, request):
         serializer = UserSerializer(
-            request.user, context=self.get_serializer_context()
+            request.user,
+            context=self.get_serializer_context()
         )
         return Response(serializer.data)
 
@@ -117,31 +136,29 @@ class IngredientViewSet(ReadOnlyViewSet):
     filterset_class = IngredientFilter
 
 
-class UserRelationMixin:
-    """Mixin для добавления/удаления связи пользователь-рецепт."""
-
-    def _add_or_remove(self, serializer_class, model, request, pk):
-        recipe = self.get_object()
-        if request.method == 'POST':
-            serializer = serializer_class(
-                data={'user': request.user.id, 'recipe': recipe.id},
-                context=self.get_serializer_context()
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(
-                serializer.data, status=status.HTTP_201_CREATED
-            )
-        model.objects.filter(user=request.user, recipe=recipe).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class RecipeViewSet(UserRelationMixin, viewsets.ModelViewSet):
-    queryset = Recipe.objects.all()
     permission_classes = (IsAuthenticatedOrAuthorOrReadOnly,)
     pagination_class = Pagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Recipe.objects.all()
+        if user.is_authenticated:
+            qs = qs.annotate(
+                is_favorited=Exists(
+                    Favorite.objects.filter(
+                        user=user, recipe=OuterRef('pk')
+                    )
+                ),
+                is_in_shopping_cart=Exists(
+                    ShoppingCart.objects.filter(
+                        user=user, recipe=OuterRef('pk')
+                    )
+                )
+            )
+        return qs
 
     def get_serializer_class(self):
         if self.action in {'create', 'update', 'partial_update'}:

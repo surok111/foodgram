@@ -139,7 +139,7 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
-    id = serializers.ReadOnlyField(source='ingredient.id')
+    id = serializers.IntegerField(source='ingredient.id', read_only=True)
     name = serializers.CharField(source='ingredient.name', read_only=True)
     measurement_unit = serializers.CharField(
         source='ingredient.measurement_unit', read_only=True
@@ -161,8 +161,10 @@ class RecipeListSerializer(ImageSerializerMixin, serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(
         source='recipe_ingredients', many=True, read_only=True
     )
-    is_favorited = serializers.SerializerMethodField()
-    is_in_shopping_cart = serializers.SerializerMethodField()
+    is_favorited = serializers.BooleanField(read_only=True, default=False)
+    is_in_shopping_cart = serializers.BooleanField(
+        read_only=True, default=False
+    )
 
     class Meta:
         model = Recipe
@@ -172,21 +174,14 @@ class RecipeListSerializer(ImageSerializerMixin, serializers.ModelSerializer):
             'name', 'image', 'text', 'cooking_time'
         )
 
-    def get_is_favorited(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return obj.favorite.filter(user=request.user).exists()
-        return False
-
-    def get_is_in_shopping_cart(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return obj.shoppingcart.filter(user=request.user).exists()
-        return False
-
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
-    ingredients = RecipeIngredientCreateSerializer(many=True)
+    ingredients = RecipeIngredientCreateSerializer(
+        many=True, allow_empty=False
+    )
+    tags = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Tag.objects.all(), allow_empty=False
+    )
     image = Base64ImageField()
     cooking_time = serializers.IntegerField(
         min_value=1,
@@ -202,21 +197,12 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, data):
-        ingredients = data.get('ingredients', [])
-        if not ingredients:
-            raise serializers.ValidationError(
-                {'ingredients': 'Добавьте хотя бы один ингредиент.'}
-            )
-        ingredient_ids = [ing['id'] for ing in ingredients]
+        ingredient_ids = [ing['id'] for ing in data.get('ingredients', [])]
         if len(ingredient_ids) != len(set(ingredient_ids)):
             raise serializers.ValidationError(
                 {'ingredients': 'Ингредиенты не должны повторяться.'}
             )
         tags = data.get('tags', [])
-        if not tags:
-            raise serializers.ValidationError(
-                {'tags': 'Добавьте хотя бы один тег.'}
-            )
         if len(tags) != len(set(tags)):
             raise serializers.ValidationError(
                 {'tags': 'Теги не должны повторяться.'}
@@ -234,18 +220,20 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
-        ingredients_data = validated_data.pop('ingredients')
-        tags = validated_data.pop('tags')
-        data = {**validated_data, 'author': self.context['request'].user}
+        data = validated_data.copy()
+        ingredients_data = data.pop('ingredients')
+        tags = data.pop('tags')
+        data['author'] = self.context['request'].user
         recipe = super().create(data)
         recipe.tags.set(tags)
         self._create_ingredients(recipe, ingredients_data)
         return recipe
 
     def update(self, instance, validated_data):
-        ingredients_data = validated_data.pop('ingredients')
-        tags = validated_data.pop('tags')
-        instance = super().update(instance, validated_data)
+        data = validated_data.copy()
+        ingredients_data = data.pop('ingredients')
+        tags = data.pop('tags')
+        instance = super().update(instance, data)
         instance.tags.set(tags)
         instance.ingredients.clear()
         self._create_ingredients(instance, ingredients_data)

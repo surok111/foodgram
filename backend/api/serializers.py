@@ -179,9 +179,6 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientCreateSerializer(
         many=True, allow_empty=False
     )
-    tags = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Tag.objects.all(), allow_empty=False
-    )
     image = Base64ImageField()
     cooking_time = serializers.IntegerField(
         min_value=1,
@@ -195,6 +192,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         fields = (
             'ingredients', 'tags', 'image', 'name', 'text', 'cooking_time'
         )
+        extra_kwargs = {'tags': {'allow_empty': False}}
 
     def validate(self, data):
         ingredient_ids = [ing['id'] for ing in data.get('ingredients', [])]

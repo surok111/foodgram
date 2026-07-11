@@ -28,7 +28,7 @@ services:
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --no-input &&
              python manage.py load_ingredients --path /app/data/ingredients.json &&
-             gunicorn --bind 0:8000 foodgram_project.wsgi"
+             gunicorn --bind 0:8000 --workers 3 foodgram_project.wsgi"
 
   frontend:
     container_name: foodgram-front

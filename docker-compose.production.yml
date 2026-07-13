@@ -31,6 +31,12 @@ services:
              python manage.py collectstatic --no-input &&
              python manage.py load_ingredients --path /app/data/ingredients.json &&
              gunicorn --bind 0:8000 --workers 3 foodgram_project.wsgi"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
 
   frontend:
     container_name: foodgram-front
@@ -52,5 +58,7 @@ services:
       - media_value:/var/html/media/
       - /etc/letsencrypt:/etc/letsencrypt
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_completed_successfully

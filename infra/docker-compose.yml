@@ -28,6 +28,7 @@ services:
 
   frontend:
     container_name: foodgram-front
+    restart: unless-stopped
     build: ../frontend
     volumes:
       - frontend_value:/app/result_build/

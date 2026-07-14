@@ -129,7 +129,6 @@ class UserRecipeBase(models.Model):
 
     class Meta:
         abstract = True
-        default_related_name = '%(class)s'
         constraints = (
             models.UniqueConstraint(
                 fields=('user', 'recipe'),
@@ -142,6 +141,14 @@ class UserRecipeBase(models.Model):
 
 
 class Favorite(UserRecipeBase):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='favorites', verbose_name='Пользователь'
+    )
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE,
+        related_name='favorites', verbose_name='Рецепт'
+    )
 
     class Meta(UserRecipeBase.Meta):
         verbose_name = 'Избранное'
@@ -149,6 +156,14 @@ class Favorite(UserRecipeBase):
 
 
 class ShoppingCart(UserRecipeBase):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='shopping_cart', verbose_name='Пользователь'
+    )
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE,
+        related_name='shopping_cart', verbose_name='Рецепт'
+    )
 
     class Meta(UserRecipeBase.Meta):
         verbose_name = 'Список покупок'

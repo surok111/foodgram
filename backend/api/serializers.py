@@ -215,6 +215,10 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                 {'ingredients': 'Ингредиенты не должны повторяться.'}
             )
         tags = data.get('tags', [])
+        if not tags:
+            raise serializers.ValidationError(
+                {'tags': 'Добавьте хотя бы один тег.'}
+            )
         if len(tags) != len(set(tags)):
             raise serializers.ValidationError(
                 {'tags': 'Теги не должны повторяться.'}

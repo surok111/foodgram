@@ -78,6 +78,11 @@ class Recipe(NamedModel):
         verbose_name_plural = 'Рецепты'
         ordering = ('-pub_date',)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.short_link:
+            self.generate_short_link()
+
     def generate_short_link(self):
         chars = string.ascii_letters + string.digits
         while True:
@@ -85,7 +90,7 @@ class Recipe(NamedModel):
             if not Recipe.objects.filter(short_link=short).exists():
                 break
         self.short_link = short
-        self.save()
+        Recipe.objects.filter(pk=self.pk).update(short_link=short)
 
     def get_favorites_count(self):
         return self.favorite.count()

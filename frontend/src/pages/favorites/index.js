@@ -30,6 +30,28 @@ const Favorites = ({ updateOrders }) => {
       })
   }
 
+  const handleRemoveFromFavorites = ({ id }) => {
+    api.removeFromFavorites({ id })
+      .then(_ => {
+        setRecipes(recipes.filter(recipe => recipe.id !== id))
+        setRecipesCount(count => count - 1)
+      })
+      .catch(err => {
+        const { errors } = err
+        if (errors) {
+          alert(errors)
+        }
+      })
+  }
+
+  const handleLikeOnFavoritesPage = ({ id, toLike }) => {
+    if (toLike) {
+      handleLike({ id, toLike })
+    } else {
+      handleRemoveFromFavorites({ id })
+    }
+  }
+
   useEffect(_ => {
     getRecipes({ page: recipesPage, tags: tagsValue })
   }, [recipesPage, tagsValue])
@@ -64,7 +86,7 @@ const Favorites = ({ updateOrders }) => {
           {...card}
           key={card.id}
           updateOrders={updateOrders}
-          handleLike={handleLike}
+          handleLike={handleLikeOnFavoritesPage}
           handleAddToCart={handleAddToCart}
         />)}
       </CardList>}
@@ -79,4 +101,3 @@ const Favorites = ({ updateOrders }) => {
 }
 
 export default Favorites
-

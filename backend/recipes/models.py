@@ -88,7 +88,7 @@ class Recipe(NamedModel):
         self.save()
 
     def get_favorites_count(self):
-        return self.favorites.count()
+        return self.favorite.count()
 
 
 class RecipeIngredient(models.Model):
@@ -143,11 +143,11 @@ class UserRecipeBase(models.Model):
 class Favorite(UserRecipeBase):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,
-        related_name='favorites', verbose_name='Пользователь'
+        related_name='favorite', verbose_name='Пользователь'
     )
     recipe = models.ForeignKey(
         Recipe, on_delete=models.CASCADE,
-        related_name='favorites', verbose_name='Рецепт'
+        related_name='favorite', verbose_name='Рецепт'
     )
 
     class Meta(UserRecipeBase.Meta):
@@ -158,11 +158,11 @@ class Favorite(UserRecipeBase):
 class ShoppingCart(UserRecipeBase):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,
-        related_name='shopping_cart', verbose_name='Пользователь'
+        related_name='shoppingcart', verbose_name='Пользователь'
     )
     recipe = models.ForeignKey(
         Recipe, on_delete=models.CASCADE,
-        related_name='shopping_cart', verbose_name='Рецепт'
+        related_name='shoppingcart', verbose_name='Рецепт'
     )
 
     class Meta(UserRecipeBase.Meta):

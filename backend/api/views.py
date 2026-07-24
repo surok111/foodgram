@@ -1,3 +1,5 @@
+import io
+
 from django.contrib.auth import get_user_model
 from django.db.models import Exists, F, OuterRef, Sum
 from django.http import FileResponse
@@ -199,7 +201,7 @@ class RecipeViewSet(UserRelationMixin, viewsets.ModelViewSet):
         )
         content = f'Список покупок:\n{content}'
         return FileResponse(
-            content.encode('utf-8'),
+            io.BytesIO(content.encode('utf-8')),
             content_type='text/plain; charset=utf-8',
             as_attachment=True,
             filename='shopping_cart.txt'

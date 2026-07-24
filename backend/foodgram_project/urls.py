@@ -9,7 +9,7 @@ from recipes.models import Recipe
 
 def redirect_short_link(request, short_link):
     recipe = get_object_or_404(Recipe, short_link=short_link)
-    return redirect('recipes-detail', pk=recipe.id)
+    return redirect(f'/recipes/{recipe.id}/')
 
 
 api_urlpatterns = [
